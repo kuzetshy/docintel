@@ -34,6 +34,6 @@ pytest, ruff, mypy.
 Week 1, in progress.
 Done: repo skeleton (uv, src/docintel packages, eval/, tests/, infra/),
 ruff, mypy (strict) and pytest with a smoke test, pre-commit secret
-scanning (gitleaks), .env.example.
-Next: FastAPI /health, CI, Docker Compose (API, Qdrant, Postgres, Langfuse), LLM abstraction,
+scanning (gitleaks), .env.example, FastAPI app with GET /health.
+Next: CI, Docker Compose (API, Qdrant, Postgres, Langfuse), LLM abstraction,
 basic /ask endpoint.
