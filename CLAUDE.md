@@ -24,6 +24,7 @@ pytest, ruff, mypy.
 
 ## Commands
 - Install: `uv sync`
+- Git hooks (once after clone): `uv run pre-commit install`
 - Run API: `uv run uvicorn docintel.api.main:app --reload`
 - Tests: `uv run pytest`
 - Lint/types: `uv run ruff check . && uv run mypy src`
@@ -32,7 +33,7 @@ pytest, ruff, mypy.
 ## Current stage (update after every changes!)
 Week 1, in progress.
 Done: repo skeleton (uv, src/docintel packages, eval/, tests/, infra/),
-ruff, mypy (strict) and pytest with a smoke test.
-Next: pre-commit secret scanning, .env.example, FastAPI /health, CI,
-Docker Compose (API, Qdrant, Postgres, Langfuse), LLM abstraction,
+ruff, mypy (strict) and pytest with a smoke test, pre-commit secret
+scanning (gitleaks), .env.example.
+Next: FastAPI /health, CI, Docker Compose (API, Qdrant, Postgres, Langfuse), LLM abstraction,
 basic /ask endpoint.
