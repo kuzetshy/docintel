@@ -1,0 +1,13 @@
+[project]
+name = "docintel"
+version = "0.1.0"
+description = "Document intelligence platform: RAG with citations, structured extraction, agents, evaluation and tracing."
+authors = [
+    { name = "kuzetshy", email = "abyla015@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"

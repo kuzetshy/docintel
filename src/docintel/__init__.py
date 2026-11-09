@@ -1,0 +1,1 @@
+"""DocIntel: document intelligence platform."""
