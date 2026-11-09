@@ -30,5 +30,9 @@ pytest, ruff, mypy.
 - Stack: `docker compose up -d`
 
 ## Current stage (update after every changes!)
-Week 1: repo skeleton, Docker Compose (API, Qdrant, Postgres, Langfuse),
-CI, LLM abstraction, basic /ask endpoint.
+Week 1, in progress.
+Done: repo skeleton (uv, src/docintel packages, eval/, tests/, infra/),
+ruff, mypy (strict) and pytest with a smoke test.
+Next: pre-commit secret scanning, .env.example, FastAPI /health, CI,
+Docker Compose (API, Qdrant, Postgres, Langfuse), LLM abstraction,
+basic /ask endpoint.
