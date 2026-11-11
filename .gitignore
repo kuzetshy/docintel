@@ -58,3 +58,7 @@ pnpm-debug.log*
 *.sqlite
 *.sqlite3
 *.db
+
+# Personal notes (local only)
+docs/plan.md
+docs/study.md
