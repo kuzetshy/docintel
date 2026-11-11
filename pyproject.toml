@@ -12,6 +12,7 @@ dependencies = [
     "google-genai>=2.34,<3",
     "httpx2>=2.16.0",
     "pydantic-settings>=2.16",
+    "qdrant-client>=1.20,<1.21",
     "tenacity>=9",
     "uvicorn>=0.54.0",
 ]
@@ -34,10 +35,12 @@ select = ["E", "F", "W", "I", "UP", "B", "ANN", "TID"]
 "fastembed".msg = "Use docintel.llm.Embedder instead of importing fastembed."
 "anthropic".msg = "Use docintel.llm instead of calling the Anthropic SDK directly."
 "openai".msg = "Use docintel.llm instead of calling the OpenAI SDK directly."
+"qdrant_client".msg = "Use docintel.retrieval.store.VectorStore instead of qdrant_client."
 
 [tool.ruff.lint.per-file-ignores]
 "src/docintel/llm/gemini.py" = ["TID251"]
 "src/docintel/llm/embeddings.py" = ["TID251"]
+"src/docintel/retrieval/store.py" = ["TID251"]
 "tests/llm/test_gemini.py" = ["TID251"]
 
 [tool.mypy]
@@ -47,6 +50,10 @@ strict = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers -m 'not live'"
+filterwarnings = [
+    # In-memory Qdrant ignores payload indexes; the server uses them.
+    "ignore:Payload indexes have no effect in the local Qdrant:UserWarning",
+]
 markers = [
     "live: calls real providers or downloads models; run with `pytest -m live`",
 ]

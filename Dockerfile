@@ -26,13 +26,18 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ---- Runtime stage: only Python and the venv, no uv, no sources ----
 FROM python:3.12.16-slim AS runtime
 
-RUN groupadd --system app && useradd --system --gid app --no-create-home app
+RUN groupadd --system app && useradd --system --gid app --no-create-home app \
+    && mkdir -p /app/.cache/fastembed && chown -R app:app /app/.cache
 
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 
 ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    EMBEDDING_CACHE_DIR=/app/.cache/fastembed \
+    # The user has no home dir; keep Hugging Face state inside the cache volume.
+    HF_HOME=/app/.cache/fastembed/huggingface
 
+WORKDIR /app
 USER app
 EXPOSE 8000
 

@@ -34,18 +34,21 @@ pytest, ruff, mypy.
 - Lint/types: `uv run ruff check . && uv run mypy src`
 - Stack (api, postgres, qdrant): `docker compose up -d`
 - Stack + Langfuse: `docker compose --profile observability up -d`
+- Ingest samples: `docker compose exec api python -m docintel.ingestion /app/data/samples`
+  (locally: `uv run python -m docintel.ingestion data/samples`)
 
 ## Current stage (update after every changes!)
-Week 1, in progress.
-Done: repo skeleton (uv, src/docintel packages, eval/, tests/, infra/),
-ruff, mypy (strict) and pytest with a smoke test, pre-commit secret
-scanning (gitleaks), .env.example, FastAPI app with GET /health,
-GitHub Actions CI (ruff, mypy, pytest, gitleaks), Dockerfile (multi-stage,
-uv, non-root) and Docker Compose (api, postgres, qdrant; Langfuse v4 with
-clickhouse, redis, minio under the `observability` profile), CI docker job,
-LLM layer in `src/docintel/llm` (ChatModel/Embedder protocols, Gemini
-adapter on gemini-3.5-flash-lite free tier, local fastembed embeddings,
-fakes for tests, retries/timeouts/cost), settings in `src/docintel/config.py`,
-ruff TID251 bans provider SDK imports outside the LLM layer.
-Next: basic /ask (ingest a few open docs into Qdrant, vector search,
-answer with citations or "not found").
+Week 1 done: `docker compose up` + ingest gives working Q&A with citations.
+Done: repo skeleton, ruff/mypy strict/pytest, pre-commit gitleaks, CI
+(quality, docker smoke test, secrets), Dockerfile + Compose (api, postgres,
+qdrant; Langfuse v4 stack under the `observability` profile), LLM layer
+(`src/docintel/llm`: ChatModel/Embedder protocols, Gemini adapter on
+gemini-3.5-flash-lite free tier, local fastembed bge-small, fakes, retries,
+timeouts, cost), settings in `src/docintel/config.py`, thin RAG slice:
+Markdown loader + section-aware chunker (`ingestion/`), Qdrant store with
+idempotent re-ingest (`retrieval/store.py`), RagService with score threshold
+0.6 + NOT_FOUND marker and [n] citations (`rag/`), POST /ask. Sample data:
+GDPR Art. 5, 6, 17 and AI Act Art. 5 in `data/samples/`.
+Ruff TID251 bans provider SDK and qdrant_client imports outside their module.
+Next (week 2): ingestion of PDF/DOCX, tables, OCR, metadata; 20 documents
+load without errors. Consider a README quickstart.

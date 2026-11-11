@@ -67,6 +67,11 @@ services:
       LANGFUSE_HOST: http://langfuse-web:3000
     ports:
       - 127.0.0.1:8000:8000
+    volumes:
+      # Documents to ingest, read-only inside the container.
+      - ./data:/app/data:ro
+      # Downloaded embedding model survives container rebuilds.
+      - fastembed_cache:/app/.cache/fastembed
     depends_on:
       postgres:
         condition: service_healthy
@@ -212,6 +217,7 @@ services:
       start_period: 1s
 
 volumes:
+  fastembed_cache:
   postgres_data:
   qdrant_data:
   clickhouse_data:
