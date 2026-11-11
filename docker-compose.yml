@@ -1,0 +1,220 @@
+# DocIntel local stack.
+#
+#   docker compose up -d                          # api, postgres, qdrant
+#   docker compose --profile observability up -d  # + Langfuse and its deps
+#
+# Values come from .env (copy .env.example). Every host port is bound to
+# 127.0.0.1, so nothing is reachable from other machines.
+# Langfuse services follow the official compose file:
+# https://github.com/langfuse/langfuse/blob/main/docker-compose.yml
+
+name: docintel
+
+x-langfuse-env: &langfuse-env
+  NEXTAUTH_URL: http://localhost:3000
+  DATABASE_URL: postgresql://${POSTGRES_USER:-docintel}:${POSTGRES_PASSWORD}@postgres:5432/langfuse
+  SALT: ${LANGFUSE_SALT:-}
+  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-}
+  TELEMETRY_ENABLED: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_USER: clickhouse
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_AUTH: ${REDIS_PASSWORD:-}
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-}
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-}
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+
+x-langfuse-depends-on: &langfuse-depends-on
+  postgres:
+    condition: service_healthy
+  clickhouse:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  minio:
+    condition: service_healthy
+
+services:
+  # ---------- Core: always started ----------
+
+  api:
+    build: .
+    image: docintel-api:dev
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Inside the Docker network services are reached by name, not localhost.
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      QDRANT_URL: http://qdrant:6333
+      LANGFUSE_HOST: http://langfuse-web:3000
+    ports:
+      - 127.0.0.1:8000:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17.11
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-docintel}
+      POSTGRES_USER: ${POSTGRES_USER:-docintel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      # Host port is configurable in case a local Postgres already uses 5432.
+      - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:6333:6333
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      # The image has no curl or wget, so speak HTTP through bash's /dev/tcp.
+      test:
+        - CMD-SHELL
+        - >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333
+          && printf "GET /readyz HTTP/1.0\r\n\r\n" >&3
+          && grep -q "200 OK" <&3'
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------- Observability: --profile observability ----------
+
+  langfuse-web:
+    image: langfuse/langfuse:4.78.0
+    profiles: [observability]
+    restart: unless-stopped
+    depends_on: *langfuse-depends-on
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-}
+      # Browser-facing media endpoint (MinIO published on the host).
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:9090
+      LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT: http://minio:9000
+      # Headless init: org, project with fixed API keys, and an admin user.
+      LANGFUSE_INIT_ORG_ID: docintel
+      LANGFUSE_INIT_ORG_NAME: DocIntel
+      LANGFUSE_INIT_PROJECT_ID: docintel
+      LANGFUSE_INIT_PROJECT_NAME: DocIntel
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
+      LANGFUSE_INIT_USER_NAME: admin
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
+    ports:
+      - 127.0.0.1:3000:3000
+    healthcheck:
+      # Next.js listens on $HOSTNAME (the container's address), not on 127.0.0.1.
+      test: ["CMD-SHELL", "wget -qO- http://$$HOSTNAME:3000/api/public/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:4.78.0
+    profiles: [observability]
+    restart: unless-stopped
+    depends_on: *langfuse-depends-on
+    environment:
+      <<: *langfuse-env
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3.62.3
+    profiles: [observability]
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+
+  redis:
+    image: redis:7.4.12
+    profiles: [observability]
+    restart: unless-stopped
+    command: --requirepass "${REDIS_PASSWORD:-}" --maxmemory-policy noeviction
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+  minio:
+    # Chainguard publishes only :latest for free, so pin by digest.
+    image: cgr.dev/chainguard/minio@sha256:db3f583fa49121942168bd6383a773b2cde3384c9a99bf7193560b9a0f3a28fd
+    profiles: [observability]
+    restart: unless-stopped
+    entrypoint: sh
+    # Create the 'langfuse' bucket before starting the server.
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+    ports:
+      - 127.0.0.1:9090:9000
+      - 127.0.0.1:9091:9001
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  clickhouse_data:
+  clickhouse_logs:
+  redis_data:
+  minio_data:
