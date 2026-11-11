@@ -29,6 +29,27 @@ jobs:
       - name: Test
         run: uv run pytest
 
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Validate compose file
+        env:
+          POSTGRES_PASSWORD: ci-only
+        run: docker compose --profile observability config --quiet
+      - name: Build API image
+        run: docker build -t docintel-api:ci .
+      - name: Smoke test /health
+        run: |
+          docker run -d --name api -p 8000:8000 docintel-api:ci
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:8000/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs api
+          exit 1
+
   secrets:
     runs-on: ubuntu-latest
     timeout-minutes: 5
