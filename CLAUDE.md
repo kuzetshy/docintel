@@ -30,7 +30,7 @@ pytest, ruff, mypy.
 - Install: `uv sync`
 - Git hooks (once after clone): `uv run pre-commit install`
 - Run API: `uv run uvicorn docintel.api.main:app --reload`
-- Tests: `uv run pytest`
+- Tests: `uv run pytest` (offline; live provider tests: `uv run pytest -m live`)
 - Lint/types: `uv run ruff check . && uv run mypy src`
 - Stack (api, postgres, qdrant): `docker compose up -d`
 - Stack + Langfuse: `docker compose --profile observability up -d`
@@ -42,5 +42,10 @@ ruff, mypy (strict) and pytest with a smoke test, pre-commit secret
 scanning (gitleaks), .env.example, FastAPI app with GET /health,
 GitHub Actions CI (ruff, mypy, pytest, gitleaks), Dockerfile (multi-stage,
 uv, non-root) and Docker Compose (api, postgres, qdrant; Langfuse v4 with
-clickhouse, redis, minio under the `observability` profile), CI docker job.
-Next: LLM abstraction, basic /ask endpoint.
+clickhouse, redis, minio under the `observability` profile), CI docker job,
+LLM layer in `src/docintel/llm` (ChatModel/Embedder protocols, Gemini
+adapter on gemini-3.5-flash-lite free tier, local fastembed embeddings,
+fakes for tests, retries/timeouts/cost), settings in `src/docintel/config.py`,
+ruff TID251 bans provider SDK imports outside the LLM layer.
+Next: basic /ask (ingest a few open docs into Qdrant, vector search,
+answer with citations or "not found").

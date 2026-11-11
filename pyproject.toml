@@ -8,6 +8,11 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.162.2",
+    "fastembed>=0.9.1",
+    "google-genai>=2.34,<3",
+    "httpx2>=2.16.0",
+    "pydantic-settings>=2.16",
+    "tenacity>=9",
     "uvicorn>=0.54.0",
 ]
 
@@ -21,7 +26,19 @@ line-length = 88
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "ANN"]
+select = ["E", "F", "W", "I", "UP", "B", "ANN", "TID"]
+
+# Rule from CLAUDE.md: provider SDKs are imported only inside the LLM layer.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"google.genai".msg = "Use docintel.llm instead of calling the Gemini SDK directly."
+"fastembed".msg = "Use docintel.llm.Embedder instead of importing fastembed."
+"anthropic".msg = "Use docintel.llm instead of calling the Anthropic SDK directly."
+"openai".msg = "Use docintel.llm instead of calling the OpenAI SDK directly."
+
+[tool.ruff.lint.per-file-ignores]
+"src/docintel/llm/gemini.py" = ["TID251"]
+"src/docintel/llm/embeddings.py" = ["TID251"]
+"tests/llm/test_gemini.py" = ["TID251"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -29,11 +46,13 @@ strict = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers -m 'not live'"
+markers = [
+    "live: calls real providers or downloads models; run with `pytest -m live`",
+]
 
 [dependency-groups]
 dev = [
-    "httpx2>=2.16.0",
     "mypy>=2.4.1",
     "pre-commit>=4.7.0",
     "pytest>=9.2.0",
